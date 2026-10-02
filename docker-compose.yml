@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: clouddesk-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: clouddesk_user
+      POSTGRES_PASSWORD: clouddesk_secure_password
+      POSTGRES_DB: clouddesk_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clouddesk_user -d clouddesk_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.8.4
+    container_name: clouddesk-qdrant
+    restart: always
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: clouddesk-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://clouddesk_user:clouddesk_secure_password@postgres:5432/clouddesk_db
+      - QDRANT_URL=http://qdrant:6333
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-super_secret_jwt_key_clouddesk_2026}
+      - CONFIDENCE_THRESHOLD=0.85
+      - ENVIRONMENT=development
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: clouddesk-frontend
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_API_URL=http://backend:8000/api/v1
+    ports:
+      - "8501:8501"
+
+volumes:
+  postgres_data:
+  qdrant_data:
