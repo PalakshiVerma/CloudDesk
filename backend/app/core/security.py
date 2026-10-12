@@ -6,21 +6,22 @@ Provides password hashing via passlib/bcrypt and JWT token encoding/decoding.
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Union
 import jwt
-from passlib.context import CryptContext
+import bcrypt
 from app.core.config import settings
-
-# Password hashing context using standard bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verifies a plain-text password against a hashed string."""
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8")[:72], hashed_password.encode("utf-8")
+    )
 
 
 def get_password_hash(password: str) -> str:
     """Generates a secure salted hash for a plain-text password."""
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(
+        password.encode("utf-8")[:72], bcrypt.gensalt()
+    ).decode("utf-8")
 
 
 def create_access_token(

@@ -48,9 +48,13 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 # Synchronous Engine (Used by Alembic migrations and synchronous scripts)
+# Explicitly use psycopg2 dialect to avoid SQLAlchemy 2.1+ defaulting to psycopg v3
 sync_db_url = settings.DATABASE_URL_SYNC
+# Normalize: strip any async driver prefix first
 if sync_db_url.startswith("postgresql+asyncpg://"):
-    sync_db_url = sync_db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+    sync_db_url = sync_db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+elif sync_db_url.startswith("postgresql://"):
+    sync_db_url = sync_db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
 sync_engine = create_engine(
     sync_db_url,
